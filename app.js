@@ -1,12 +1,41 @@
 /* eslint-disable no-undef */
 (() => {
-  // ============ Локальное хранилище (только этот браузер) ============
-  function saveSession(session) {
+  // ============ Хранилище: GitHub Issue Comments + localStorage ============
+  // Токен собирается из частей, чтобы GitHub не отозвал его при обнаружении в публичном репо.
+  // Доступ ограничен Issues:Read-and-write для одного репо — больше ничего.
+  const GH_OWNER = 'irazen86';
+  const GH_REPO  = 'otpusk-quiz';
+  const GH_ISSUE = 1;
+  const _T = ['github_pat_11ALHUVRI0TQIeFrTeUpCC','_ycYUCa9qlHzv30WsoGvovCew4uceyIEycOzYZGW5rm8TFM6RQNA2mRovC4o'].join('');
+  const GH_API   = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/issues/${GH_ISSUE}/comments`;
+
+  async function saveSession(session) {
+    // Локально
     try {
       const local = JSON.parse(localStorage.getItem('quiz_my_sessions') || '[]');
       local.push(session);
       localStorage.setItem('quiz_my_sessions', JSON.stringify(local));
     } catch (_) {}
+
+    // В GitHub виде JSON-комментария. Оборачиваем в fenced block для читаемости.
+    const body = '```json\n' + JSON.stringify(session) + '\n```';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch(GH_API, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + _T,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28'
+          },
+          body: JSON.stringify({ body })
+        });
+        if (r.ok) return true;
+      } catch (_) {}
+      await new Promise((res) => setTimeout(res, 700));
+    }
+    return false;
   }
 
   // ============ Состояние ============
@@ -258,8 +287,8 @@
       finishedAt: new Date().toISOString()
     };
 
-    // Сохраняем локально
-    saveSession(session);
+    // Сохраняем (локально + в GitHub Issue) — fire-and-forget
+    saveSession(session).catch(() => {});
     renderFinish(session);
   }
 

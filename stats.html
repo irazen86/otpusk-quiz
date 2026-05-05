@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Мои прохождения · Викторина по отпускам</title>
+    <title>Статистика · Викторина по отпускам</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -26,9 +26,21 @@
       .pill.green { background: rgba(61,220,151,0.18); color: #b6f5d8; }
       .pill.red { background: rgba(255,94,126,0.18); color: #ffd0d8; }
       .pill.gray { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+      .q-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 18px; margin-bottom: 12px; }
+      .q-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; align-items: flex-start; flex-wrap: wrap; }
+      .q-num { font-weight: 700; color: var(--text-muted); margin-right: 8px; }
+      .q-title { font-weight: 700; line-height: 1.4; flex: 1; }
+      .opt-row { display: grid; grid-template-columns: 24px 1fr 80px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
+      .opt-letter { width: 22px; height: 22px; border-radius: 6px; background: rgba(255,255,255,0.08); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+      .opt-row.is-correct .opt-letter { background: var(--grad-success); color: #053b25; }
+      .opt-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 6px; height: 8px; overflow: hidden; position: relative; margin-top: 4px; }
+      .opt-bar { height: 100%; background: rgba(255,255,255,0.25); border-radius: 6px; transition: width 0.6s; }
+      .opt-row.is-correct .opt-bar { background: var(--grad-success); }
+      .opt-text { line-height: 1.4; }
+      .opt-pct { font-weight: 700; font-size: 13px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
       .top-actions { display: flex; gap: 10px; flex-wrap: wrap; }
       .empty { text-align: center; color: var(--text-muted); padding: 60px 20px; }
-      .note { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 18px; color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 24px; }
+      .loading { text-align: center; padding: 30px; color: var(--text-muted); }
     </style>
   </head>
   <body>
@@ -42,25 +54,23 @@
       <div class="card" style="width: 100%;">
         <div class="stats-header">
           <div>
-            <div class="badge">Моя история</div>
+            <div class="badge">Общая статистика</div>
             <h1 class="title" style="font-size: clamp(26px, 4vw, 36px); margin-top: 12px;">
-              Мои <span class="title-accent">прохождения</span>
+              Результаты <span class="title-accent">всех участников</span>
             </h1>
           </div>
           <div class="top-actions">
+            <button class="btn btn-ghost" id="refresh">Обновить</button>
             <button class="btn btn-ghost" id="csv">Скачать CSV</button>
-            <button class="btn btn-ghost" id="clear">Очистить историю</button>
             <a class="btn btn-primary" href="index.html">К квизу</a>
           </div>
         </div>
 
-        <div class="note">
-          История прохождений хранится только в этом браузере на этом устройстве. Если вы поделитесь ссылкой на квиз — каждый увидит свою историю на своём устройстве.
-        </div>
+        <div id="loading" class="loading">Загружаем данные…</div>
 
-        <div class="kpi-row" id="kpi-row"></div>
+        <div class="kpi-row" id="kpi-row" style="display:none;"></div>
 
-        <h2 class="section-title">Все попытки</h2>
+        <h2 class="section-title">Участники</h2>
         <div class="table-wrap">
           <table id="sessions-table">
             <thead>
@@ -71,11 +81,20 @@
             <tbody></tbody>
           </table>
         </div>
+
+        <h2 class="section-title">По вопросам</h2>
+        <div id="questions"></div>
       </div>
     </main>
 
     <script src="questions.js"></script>
     <script>
+      // Тот же токен — read-only сценарий тоже требует auth для приватных, но
+      // публичные репо читаются без токена. Используем без auth для простоты и кэша.
+      const GH_OWNER = 'irazen86';
+      const GH_REPO  = 'otpusk-quiz';
+      const GH_ISSUE = 1;
+
       const fmtDate = (s) => {
         if (!s) return '—';
         const d = new Date(s);
@@ -86,53 +105,79 @@
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       }
 
-      function loadLocal() {
+      function parseSessionFromBody(body) {
+        // Извлекаем JSON между ```json ... ```
+        const m = body.match(/```json\s*([\s\S]*?)\s*```/);
+        if (!m) return null;
         try {
-          return JSON.parse(localStorage.getItem('quiz_my_sessions') || '[]');
+          return JSON.parse(m[1]);
         } catch (_) {
-          return [];
+          return null;
         }
       }
 
       let cachedSessions = [];
 
-      function render() {
-        const sessions = loadLocal().slice().reverse();
-        cachedSessions = sessions;
-        renderKPIs(sessions);
-        renderSessions(sessions);
+      async function loadStats() {
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+        loading.textContent = 'Загружаем данные…';
+        try {
+          // Постранично: до 100 на страницу, проходим все страницы
+          const sessions = [];
+          for (let page = 1; page <= 20; page++) {
+            const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/issues/${GH_ISSUE}/comments?per_page=100&page=${page}&_=${Date.now()}`;
+            const r = await fetch(url, {
+              headers: { 'Accept': 'application/vnd.github+json' },
+              cache: 'no-store'
+            });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const comments = await r.json();
+            if (!comments.length) break;
+            comments.forEach((c) => {
+              const s = parseSessionFromBody(c.body || '');
+              if (s) sessions.push(s);
+            });
+            if (comments.length < 100) break;
+          }
+          // Сортировка по дате финиша (свежие сверху)
+          sessions.sort((a, b) => new Date(b.finishedAt || 0) - new Date(a.finishedAt || 0));
+          cachedSessions = sessions;
+          loading.style.display = 'none';
+          document.getElementById('kpi-row').style.display = '';
+          renderKPIs(sessions);
+          renderSessions(sessions);
+          renderQuestions(sessions);
+        } catch (e) {
+          loading.textContent = 'Не удалось загрузить статистику. Попробуйте обновить.';
+        }
       }
 
       function renderKPIs(sessions) {
         const total = sessions.length;
-        if (!total) {
-          document.getElementById('kpi-row').innerHTML = '';
-          return;
-        }
         const totalAnswers = sessions.reduce((s, x) => s + (x.answers ? x.answers.length : 0), 0);
         const totalCorrect = sessions.reduce((s, x) => s + (x.score || 0), 0);
         const accuracy = totalAnswers ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
-        const best = sessions.reduce((m, x) => Math.max(m, x.score || 0), 0);
-        const avg = (sessions.reduce((s, x) => s + (x.score || 0), 0) / total).toFixed(1);
+        const avgScore = total ? (totalCorrect / total).toFixed(1) : '—';
         document.getElementById('kpi-row').innerHTML = `
-          <div class="kpi"><div class="kpi-label">Попыток</div><div class="kpi-value">${total}</div></div>
-          <div class="kpi"><div class="kpi-label">Лучший балл</div><div class="kpi-value">${best}</div></div>
-          <div class="kpi"><div class="kpi-label">Средний балл</div><div class="kpi-value">${avg}</div></div>
+          <div class="kpi"><div class="kpi-label">Всего прошло</div><div class="kpi-value">${total}</div></div>
+          <div class="kpi"><div class="kpi-label">Средний балл</div><div class="kpi-value">${avgScore}</div></div>
           <div class="kpi"><div class="kpi-label">Точность</div><div class="kpi-value">${accuracy}%</div></div>
+          <div class="kpi"><div class="kpi-label">Всего ответов</div><div class="kpi-value">${totalAnswers}</div></div>
         `;
       }
 
       function renderSessions(sessions) {
         const tbody = document.querySelector('#sessions-table tbody');
         if (!sessions.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="empty">Здесь появятся ваши попытки после прохождения квиза</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" class="empty">Пока никто не проходил</td></tr>`;
           return;
         }
         tbody.innerHTML = sessions.map((s, idx) => {
           const total = s.total || 0;
           const pct = total ? Math.round((s.score / total) * 100) : 0;
           return `<tr>
-            <td>${sessions.length - idx}</td>
+            <td>${idx + 1}</td>
             <td>${escapeHtml(s.name || '—')}</td>
             <td><strong>${s.score}</strong> / ${total}</td>
             <td><span class="pill ${pct >= 80 ? 'green' : pct >= 50 ? 'gray' : 'red'}">${pct}%</span></td>
@@ -141,10 +186,48 @@
         }).join('');
       }
 
+      function renderQuestions(sessions) {
+        const QS = window.QUIZ_QUESTIONS || [];
+        const wrap = document.getElementById('questions');
+        wrap.innerHTML = QS.map((q, idx) => {
+          const optsCount = q.options.map(() => 0);
+          let total = 0;
+          let correctCount = 0;
+          sessions.forEach((s) => {
+            const a = (s.answers || []).find((x) => x.qIndex === idx);
+            if (a && typeof a.chosen === 'number' && a.chosen >= 0 && a.chosen < q.options.length) {
+              optsCount[a.chosen]++;
+              total++;
+              if (a.chosen === q.correct) correctCount++;
+            }
+          });
+          const accuracy = total ? Math.round((correctCount / total) * 100) : 0;
+          const optsHtml = q.options.map((opt, i) => {
+            const cnt = optsCount[i];
+            const pct = total ? Math.round((cnt / total) * 100) : 0;
+            return `<div class="opt-row ${i === q.correct ? 'is-correct' : ''}">
+              <span class="opt-letter">${'АБВГДЕ'[i]}</span>
+              <div>
+                <div class="opt-text">${escapeHtml(opt)}</div>
+                <div class="opt-bar-wrap"><div class="opt-bar" style="width: ${pct}%"></div></div>
+              </div>
+              <span class="opt-pct">${pct}% · ${cnt}</span>
+            </div>`;
+          }).join('');
+          return `<div class="q-card">
+            <div class="q-head">
+              <div class="q-title"><span class="q-num">${idx + 1}.</span>${escapeHtml(q.q)}</div>
+              <span class="pill ${accuracy >= 70 ? 'green' : accuracy >= 40 ? 'gray' : 'red'}">${accuracy}% верно · ${total} отв.</span>
+            </div>
+            ${optsHtml}
+          </div>`;
+        }).join('');
+      }
+
       function downloadCsv() {
         if (!cachedSessions.length) return;
         const rows = [['#', 'Имя', 'Балл', 'Всего', 'Процент', 'Начало', 'Финиш']];
-        cachedSessions.slice().reverse().forEach((s, i) => {
+        cachedSessions.forEach((s, i) => {
           const pct = s.total ? Math.round((s.score / s.total) * 100) + '%' : '0%';
           rows.push([i + 1, s.name, s.score, s.total, pct, s.startedAt || '', s.finishedAt || '']);
         });
@@ -153,20 +236,14 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `quiz-history-${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `quiz-results-${new Date().toISOString().slice(0,10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       }
 
-      function clearHistory() {
-        if (!confirm('Удалить всю историю прохождений на этом устройстве?')) return;
-        localStorage.removeItem('quiz_my_sessions');
-        render();
-      }
-
+      document.getElementById('refresh').addEventListener('click', loadStats);
       document.getElementById('csv').addEventListener('click', downloadCsv);
-      document.getElementById('clear').addEventListener('click', clearHistory);
-      render();
+      loadStats();
     </script>
   </body>
 </html>
