@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Статистика квиза</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .app.wide { max-width: 1100px; align-items: flex-start; padding-top: 32px; padding-bottom: 64px; }
+      .stats-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+      .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 32px; }
+      .kpi { background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 18px 20px; backdrop-filter: blur(20px); }
+      .kpi-label { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
+      .kpi-value { font-family: 'Unbounded', sans-serif; font-size: 36px; font-weight: 800; line-height: 1; background: var(--grad-primary); background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: gradient-shift 5s ease infinite; }
+      .section-title { font-family: 'Unbounded', sans-serif; font-size: 22px; font-weight: 700; margin: 32px 0 16px; }
+      .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+      th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+      th { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); background: rgba(255,255,255,0.04); }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background: rgba(255,255,255,0.04); }
+      .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+      .pill.green { background: rgba(61,220,151,0.18); color: #b6f5d8; }
+      .pill.red { background: rgba(255,94,126,0.18); color: #ffd0d8; }
+      .pill.gray { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+      .q-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 18px; margin-bottom: 12px; }
+      .q-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; align-items: flex-start; flex-wrap: wrap; }
+      .q-num { font-weight: 700; color: var(--text-muted); margin-right: 8px; }
+      .q-title { font-weight: 700; line-height: 1.4; flex: 1; }
+      .opt-row { display: grid; grid-template-columns: 24px 1fr 60px; gap: 10px; align-items: center; padding: 6px 0; font-size: 14px; }
+      .opt-letter { width: 22px; height: 22px; border-radius: 6px; background: rgba(255,255,255,0.08); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+      .opt-row.is-correct .opt-letter { background: var(--grad-success); color: #053b25; }
+      .opt-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 6px; height: 8px; overflow: hidden; position: relative; margin-top: 4px; }
+      .opt-bar { height: 100%; background: rgba(255,255,255,0.25); border-radius: 6px; transition: width 0.6s; }
+      .opt-row.is-correct .opt-bar { background: var(--grad-success); }
+      .opt-text { line-height: 1.4; }
+      .opt-pct { font-weight: 700; font-size: 13px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+      .top-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .empty { text-align: center; color: var(--text-muted); padding: 60px 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="bg">
+      <div class="blob blob1"></div>
+      <div class="blob blob2"></div>
+      <div class="blob blob3"></div>
+    </div>
+
+    <main class="app wide">
+      <div class="card" style="width: 100%;">
+        <div class="stats-header">
+          <div>
+            <div class="badge">Статистика</div>
+            <h1 class="title" style="font-size: clamp(26px, 4vw, 36px); margin-top: 12px;">
+              Результаты <span class="title-accent">квиза</span>
+            </h1>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-ghost" id="refresh">Обновить</button>
+            <button class="btn btn-ghost" id="csv">Скачать CSV</button>
+            <a class="btn btn-primary" href="index.html">К квизу</a>
+          </div>
+        </div>
+
+        <div class="kpi-row" id="kpi-row"></div>
+
+        <h2 class="section-title">Участники</h2>
+        <div class="table-wrap">
+          <table id="sessions-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Имя</th><th>Результат</th><th>%</th><th>Дата</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <h2 class="section-title">По вопросам</h2>
+        <div id="questions"></div>
+      </div>
+    </main>
+
+    <script src="questions.js"></script>
+    <script>
+      const BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019df89b-81fc-7de4-af86-afc4af25f331';
+
+      const fmtDate = (s) => {
+        if (!s) return '—';
+        const d = new Date(s);
+        return d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+      };
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+
+      let cachedSessions = [];
+
+      async function loadStats() {
+        try {
+          const r = await fetch(BLOB_URL + '?cb=' + Date.now(), { cache: 'no-store' });
+          if (!r.ok) throw new Error('Не удалось загрузить');
+          const data = await r.json();
+          const sessions = (data.sessions || []).slice().reverse();
+          cachedSessions = sessions;
+          renderKPIs(sessions);
+          renderSessions(sessions);
+          renderQuestions(sessions);
+        } catch (e) {
+          document.getElementById('kpi-row').innerHTML = '<div class="empty">Не удалось загрузить статистику</div>';
+        }
+      }
+
+      function renderKPIs(sessions) {
+        const total = sessions.length;
+        const totalAnswers = sessions.reduce((s, x) => s + (x.answers ? x.answers.length : 0), 0);
+        const totalCorrect = sessions.reduce((s, x) => s + (x.score || 0), 0);
+        const accuracy = totalAnswers ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+        const avgScore = total ? (sessions.reduce((s, x) => s + (x.score || 0), 0) / total).toFixed(1) : '—';
+        document.getElementById('kpi-row').innerHTML = `
+          <div class="kpi"><div class="kpi-label">Всего прошло</div><div class="kpi-value">${total}</div></div>
+          <div class="kpi"><div class="kpi-label">Средний балл</div><div class="kpi-value">${avgScore}</div></div>
+          <div class="kpi"><div class="kpi-label">Точность</div><div class="kpi-value">${accuracy}%</div></div>
+          <div class="kpi"><div class="kpi-label">Всего ответов</div><div class="kpi-value">${totalAnswers}</div></div>
+        `;
+      }
+
+      function renderSessions(sessions) {
+        const tbody = document.querySelector('#sessions-table tbody');
+        if (!sessions.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty">Пока никто не проходил</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = sessions.map((s, idx) => {
+          const total = s.total || 0;
+          const pct = total ? Math.round((s.score / total) * 100) : 0;
+          return `<tr>
+            <td>${sessions.length - idx}</td>
+            <td>${escapeHtml(s.name || '—')}</td>
+            <td><strong>${s.score}</strong> / ${total}</td>
+            <td><span class="pill ${pct >= 80 ? 'green' : pct >= 50 ? 'gray' : 'red'}">${pct}%</span></td>
+            <td>${fmtDate(s.finishedAt || s.startedAt)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      function renderQuestions(sessions) {
+        const QS = window.QUIZ_QUESTIONS || [];
+        const wrap = document.getElementById('questions');
+        wrap.innerHTML = QS.map((q, idx) => {
+          // Считаем по сессиям сколько кто что выбрал
+          const optsCount = q.options.map(() => 0);
+          let total = 0;
+          let correctCount = 0;
+          sessions.forEach((s) => {
+            const a = (s.answers || []).find((x) => x.qIndex === idx);
+            if (a && typeof a.chosen === 'number' && a.chosen >= 0 && a.chosen < q.options.length) {
+              optsCount[a.chosen]++;
+              total++;
+              if (a.chosen === q.correct) correctCount++;
+            }
+          });
+          const accuracy = total ? Math.round((correctCount / total) * 100) : 0;
+          const optsHtml = q.options.map((opt, i) => {
+            const cnt = optsCount[i];
+            const pct = total ? Math.round((cnt / total) * 100) : 0;
+            return `<div class="opt-row ${i === q.correct ? 'is-correct' : ''}">
+              <span class="opt-letter">${'АБВГДЕ'[i]}</span>
+              <div>
+                <div class="opt-text">${escapeHtml(opt)}</div>
+                <div class="opt-bar-wrap"><div class="opt-bar" style="width: ${pct}%"></div></div>
+              </div>
+              <span class="opt-pct">${pct}% · ${cnt}</span>
+            </div>`;
+          }).join('');
+          return `<div class="q-card">
+            <div class="q-head">
+              <div class="q-title"><span class="q-num">${idx + 1}.</span>${escapeHtml(q.q)}</div>
+              <span class="pill ${accuracy >= 70 ? 'green' : accuracy >= 40 ? 'gray' : 'red'}">${accuracy}% верно · ${total} отв.</span>
+            </div>
+            ${optsHtml}
+          </div>`;
+        }).join('');
+      }
+
+      function downloadCsv() {
+        const rows = [['#', 'Имя', 'Балл', 'Всего', 'Процент', 'Начало', 'Финиш']];
+        cachedSessions.slice().reverse().forEach((s, i) => {
+          const pct = s.total ? Math.round((s.score / s.total) * 100) + '%' : '0%';
+          rows.push([i + 1, s.name, s.score, s.total, pct, s.startedAt || '', s.finishedAt || '']);
+        });
+        const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `quiz-results-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      document.getElementById('refresh').addEventListener('click', loadStats);
+      document.getElementById('csv').addEventListener('click', downloadCsv);
+      loadStats();
+    </script>
+  </body>
+</html>

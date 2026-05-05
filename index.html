@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Квиз: Оформляем отпуск</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg">
+      <div class="blob blob1"></div>
+      <div class="blob blob2"></div>
+      <div class="blob blob3"></div>
+    </div>
+
+    <main id="app" class="app">
+      <!-- Экран старта -->
+      <section id="screen-start" class="card screen active">
+        <div class="badge">19 вопросов · ≈5 минут</div>
+        <h1 class="title">
+          Оформляем отпуск<br /><span class="title-accent">квест с подвохом</span>
+        </h1>
+        <p class="subtitle">
+          Проверим, как хорошо вы знаете путь от заявки до отпускных. Только один правильный ответ в каждом вопросе.
+        </p>
+        <label class="field">
+          <span class="field-label">Как вас зовут?</span>
+          <input
+            id="name"
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+            placeholder="Имя или ник"
+          />
+        </label>
+        <button id="start-btn" class="btn btn-primary">
+          Поехали
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </section>
+
+      <!-- Экран вопроса -->
+      <section id="screen-quiz" class="card screen">
+        <header class="quiz-header">
+          <div class="progress">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <div class="progress-meta">
+            <span id="q-counter">1 / 19</span>
+            <span id="score-counter" class="score">0 ✓</span>
+          </div>
+        </header>
+
+        <h2 id="question-text" class="question"></h2>
+        <ul id="options" class="options"></ul>
+
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+
+        <div class="quiz-footer">
+          <button id="next-btn" class="btn btn-primary" disabled>
+            Дальше
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Экран финиша -->
+      <section id="screen-finish" class="card screen">
+        <div id="finish-emoji" class="finish-emoji">🎉</div>
+        <h2 id="finish-title" class="title">Готово!</h2>
+        <p id="finish-subtitle" class="subtitle"></p>
+        <div class="result-big">
+          <span id="result-score">0</span><span class="result-total">/ 19</span>
+        </div>
+        <div class="result-percent" id="result-percent">0%</div>
+
+        <div id="review" class="review"></div>
+
+        <div class="finish-actions">
+          <button id="restart-btn" class="btn btn-ghost">Пройти ещё раз</button>
+        </div>
+      </section>
+    </main>
+
+    <canvas id="confetti"></canvas>
+
+    <script src="questions.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
