@@ -1,37 +1,12 @@
 /* eslint-disable no-undef */
 (() => {
-  // ============ Облачное хранилище ============
-  const BLOB_ID = '019df89b-81fc-7de4-af86-afc4af25f331';
-  const BLOB_URL = 'https://jsonblob.com/api/jsonBlob/' + BLOB_ID;
-
-  // Сохраняет результат участника. Без ожидания — fire-and-forget с retry.
-  async function saveSession(session) {
-    // Дублируем в localStorage на случай отвала сети
+  // ============ Локальное хранилище (только этот браузер) ============
+  function saveSession(session) {
     try {
       const local = JSON.parse(localStorage.getItem('quiz_my_sessions') || '[]');
       local.push(session);
       localStorage.setItem('quiz_my_sessions', JSON.stringify(local));
     } catch (_) {}
-
-    // Получаем текущий blob, добавляем сессию, перезаписываем
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const r = await fetch(BLOB_URL, { cache: 'no-store' });
-        const data = r.ok ? await r.json() : { sessions: [] };
-        if (!Array.isArray(data.sessions)) data.sessions = [];
-        data.sessions.push(session);
-        const put = await fetch(BLOB_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (put.ok) return true;
-      } catch (e) {
-        // повторим
-      }
-      await new Promise((res) => setTimeout(res, 600));
-    }
-    return false;
   }
 
   // ============ Состояние ============
@@ -283,8 +258,8 @@
       finishedAt: new Date().toISOString()
     };
 
-    // Сохраняем в облако (не блокируем UI)
-    saveSession(session).catch(() => {});
+    // Сохраняем локально
+    saveSession(session);
     renderFinish(session);
   }
 
