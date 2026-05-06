@@ -85,6 +85,30 @@
       </section>
     </main>
 
+    <!-- Оверлей награды -->
+    <div id="award-overlay" class="award-overlay" aria-hidden="true">
+      <div class="award-stage">
+        <div class="award-glow"></div>
+        <div id="award-medal" class="award-medal">
+          <div class="award-medal-ring"></div>
+          <div class="award-medal-core">
+            <span id="award-emoji" class="award-emoji">🏆</span>
+          </div>
+          <div class="award-ribbon left"></div>
+          <div class="award-ribbon right"></div>
+        </div>
+        <div class="award-text-wrap">
+          <div class="award-eyebrow">Вам присвоено звание</div>
+          <h2 id="award-title" class="award-title"></h2>
+          <p id="award-subtitle" class="award-subtitle"></p>
+          <div class="award-score"><span id="award-score-value">0</span> из <span id="award-score-total">19</span></div>
+        </div>
+        <button id="award-continue" class="btn btn-primary award-continue">
+          Посмотреть, где ошибся
+        </button>
+      </div>
+    </div>
+
     <canvas id="confetti"></canvas>
 
     <script src="questions.js"></script>

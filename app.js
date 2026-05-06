@@ -60,6 +60,21 @@
   const CELEBRATION_EMOJI = ['🎉','✨','🌟','🔥','💫','🚀','🎊','💥','⭐️','🏆','🥳','💯'];
   const WRONG_PHRASES = ['Не совсем так','Мимо, но не страшно','Почти. Но нет','Бывает!','Не угадали','Чуть-чуть мимо'];
 
+  // ============ Шкала званий ============
+  const RANKS = [
+    { min: 19, emoji: '🏆', title: 'Знаток отпускного кодекса', sub: 'Идеальный результат. С вами в отпуск точно без приключений.' },
+    { min: 17, emoji: '🎖️', title: 'Магистр отпускных дел', sub: 'Почти безупречно — мелочи можно уточнить, но в целом вы ас.' },
+    { min: 15, emoji: '📚', title: 'Бывалый отпускник',     sub: 'Опыт чувствуется — основное знаете назубок.' },
+    { min: 12, emoji: '🌴', title: 'Уверенный пользователь отпуска', sub: 'Базу держите крепко, нюансы освежим — и будет лёгкое лето.' },
+    { min: 9,  emoji: '🧭', title: 'Юный исследователь HR-джунглей', sub: 'Дорогу в отпуск нашли, но кое-где ещё блуждаете.' },
+    { min: 6,  emoji: '🐢', title: 'Стажёр-отпускник', sub: 'Не торопитесь — лучше перечитать правила и заходите ещё раз.' },
+    { min: 3,  emoji: '😅', title: 'Турист без карты', sub: 'Похоже, отпуск для вас — это сразу к морю, а формальности потом.' },
+    { min: 0,  emoji: '🛟', title: 'Отпускной первооткрыватель', sub: 'Не переживайте, теперь точно знаете, к кому идти за подсказкой — к HR!' }
+  ];
+  function getRank(score) {
+    return RANKS.find((r) => score >= r.min) || RANKS[RANKS.length - 1];
+  }
+
   // ============ DOM ============
   const $ = (id) => document.getElementById(id);
   const screens = {
@@ -294,26 +309,10 @@
 
   function renderFinish(session) {
     const pct = Math.round((session.score / session.total) * 100);
-    let emoji = '🎉', title = 'Отличный результат!', subtitle = '';
-    if (pct === 100) {
-      emoji = '🏆'; title = 'Идеально!';
-      subtitle = `${session.name}, вы знаете всё про отпуска. Просто супер!`;
-    } else if (pct >= 80) {
-      emoji = '🌟'; title = 'Отличный результат!';
-      subtitle = `${session.name}, вы здорово ориентируетесь в правилах`;
-    } else if (pct >= 60) {
-      emoji = '👍'; title = 'Неплохо!';
-      subtitle = `${session.name}, основы вы знаете — а нюансы можно подтянуть`;
-    } else if (pct >= 40) {
-      emoji = '📚'; title = 'Есть над чем подумать';
-      subtitle = `${session.name}, рекомендуем перечитать инструкцию по отпускам`;
-    } else {
-      emoji = '🤓'; title = 'Самое время разобраться';
-      subtitle = `${session.name}, не расстраивайтесь — теперь вы точно знаете, где пробелы`;
-    }
-    $('finish-emoji').textContent = emoji;
-    $('finish-title').textContent = title;
-    $('finish-subtitle').textContent = subtitle;
+    const rank = getRank(session.score);
+    $('finish-emoji').textContent = rank.emoji;
+    $('finish-title').textContent = rank.title;
+    $('finish-subtitle').textContent = `${session.name}, ${rank.sub}`;
     $('result-score').textContent = session.score;
     $('result-percent').textContent = `${pct}% правильных ответов`;
 
@@ -341,8 +340,35 @@
     });
 
     showScreen('finish');
-    spawnConfetti(160);
-    setTimeout(() => spawnConfetti(120, { fromCenter: true, big: true }), 400);
+    showAward(session);
+  }
+
+  // ============ Оверлей награждения ============
+  function showAward(session) {
+    const rank = getRank(session.score);
+    const overlay = $('award-overlay');
+    $('award-emoji').textContent = rank.emoji;
+    $('award-title').textContent = rank.title;
+    $('award-subtitle').textContent = rank.sub;
+    $('award-score-value').textContent = session.score;
+    $('award-score-total').textContent = session.total;
+
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+
+    // Салют конфетти — привязан к размеру награды
+    const burstSize = session.score >= 17 ? 220 : session.score >= 12 ? 160 : 110;
+    setTimeout(() => spawnConfetti(burstSize), 400);
+    setTimeout(() => spawnConfetti(burstSize * 0.8, { fromCenter: true, big: true }), 700);
+    if (session.score >= 17) {
+      setTimeout(() => spawnConfetti(120, { fromCenter: true, big: true }), 1300);
+    }
+  }
+
+  function hideAward() {
+    const overlay = $('award-overlay');
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
   }
 
   // ============ Старт-кнопки ============
@@ -351,7 +377,9 @@
     if (e.key === 'Enter') startQuiz();
   });
   $('next-btn').addEventListener('click', nextQuestion);
+  $('award-continue').addEventListener('click', hideAward);
   $('restart-btn').addEventListener('click', () => {
+    hideAward();
     $('name').value = state.name;
     showScreen('start');
   });
